@@ -102,12 +102,18 @@ def _parser():
 
 def set_defaults(settings):
     global poll_interval
+    global sensors
+
     set_default_timezone(pytz.timezone(settings['timezone']))
     poll_interval = settings['update_interval'] if 'update_interval' in settings else 60
     # if 'port' not in settings['mqtt']:
     #     settings['mqtt']['port'] = 1883
     if 'sensors' not in settings:
         settings['sensors'] = {}
+    
+    throttling = { k : throttling_base(*v)  for k,v in throttles.items()}
+    sensors = {**sensors, **throttling}
+
     for sensor in sensors:
         if sensor not in settings['sensors']:
             settings['sensors'][sensor] = True
@@ -137,6 +143,15 @@ def check_settings(settings):
         settings['sensors']['updates'] = False
     if 'power_integer_state' in settings:
         write_message_to_console('power_integer_state is deprecated please remove this option power state is now a binary_sensor!')
+    
+    sensors_enabled = { k for k,v in settings['sensors'].items() if v }
+    requires_vcgencmd = { k for k,v in sensors.items() if v.get("requires_vcgencmd")  }   
+    requires_vcgencmd = requires_vcgencmd.intersection(sensors_enabled)
+
+    if requires_vcgencmd and vcgencmd_missing:
+        write_message_to_console('Unable to find vcgencmd package. Throttling and GPU Temp will not be shown.')
+        for sensor in requires_vcgencmd:
+            settings['sensors'][sensor] = False     
 
 def add_drives():
     drives = settings['sensors']['external_drives']

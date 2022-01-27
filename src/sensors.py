@@ -2,6 +2,7 @@
 
 import re
 import time
+from typing import Callable
 import pytz
 import psutil
 import socket
@@ -9,6 +10,9 @@ import platform
 import subprocess
 import datetime as dt
 import sys
+
+VCGENCMD = "vcgencmd"
+
 
 # Only needed if using alternate method of obtaining CPU temperature (see commented out code for approach)
 #from os import walk
@@ -29,6 +33,12 @@ try:
 except ImportError:
     apt_disabled = True
 
+try:
+    subprocess.run(VCGENCMD)
+    vcgencmd_missing = False
+except Exception:
+    vcgencmd_missing = True
+
 
 # Get OS information
 OS_DATA = {}
@@ -44,6 +54,15 @@ DEFAULT_TIME_ZONE = None
 
 if not rpi_power_disabled:
     _underVoltage = new_under_voltage()
+
+
+def vcgencmd(arg: str):
+    cmd = [VCGENCMD, arg]
+
+    try:
+        return subprocess.check_output(cmd)
+    except subprocess.CalledProcessError as e:
+        return None
 
 def set_default_timezone(timezone):
     global DEFAULT_TIME_ZONE
@@ -79,8 +98,33 @@ def get_updates():
     cache.upgrade()
     return str(cache.get_changes().__len__())
 
+def get_throttling(bit):
+    try:
+        flags_raw = vcgencmd(arg="get_throttleda")
+        flags = int(flags_raw.split("=")[-1].strip(), 16)
+        
+        if flags is not None:
+            return bool(flags & (1 << bit))
+    except Exception as e:
+        print(f'Could not establish throttled state of {bit}: {str(e)}')
+        raise
+    
+    return None
+
+def get_gpu_temp():
+    temp = 'Unknown'
+
+    try:
+        temp_raw = vcgencmd(arg="measure_tempa")
+        temp = temp_raw.split("=")[1].split("'")[0]
+    except Exception as e:
+        print(f'Could not establish GPU temperature reading: {str(e)}')
+        raise
+    
+    return temp
+
 # Temperature method depending on system distro
-def get_temp():
+def get_cpu_temp():
     temp = 'Unknown'
     # Utilising psutil for temp reading on ARM arch
     try:
@@ -216,14 +260,39 @@ def external_drive_base(drive, drive_path) -> dict:
         'function': lambda: get_disk_usage(f'{drive_path}')
         }
 
+def throttling_base(name, bit, class_name):
+    return  {
+        'name': name,
+        'class': class_name,
+        'sensor_type': 'binary_sensor',
+        'function': lambda: get_throttling(bit)},
+
+throttles = {
+    "under_volt_now":   (0, "Under-voltage detected",  "problem"),
+    "freq_capped_now":  (1, "Arm frequency capped", "problem"),
+    "throttled_now":    (2, "Currently throttled", "problem"),
+    "temp_limit_now":   (3, "Soft temperature limit active", "heat"),
+    "under_volt_past":  (16, "Under-voltage has occurred", "problem"),
+    "freq_capped_past": (17, "Arm frequency capped has occurred", "problem"),
+    "throttled_past":   (18, "Throttling has occurred", "problem"),
+    "temp_limit_past":	(19, "Soft temperature limit has occurred", "heat"),
+}
+
 sensors = {
-          'temperature': 
-                {'name':'Temperature',
+          'gpu_temperature': 
+                {'name':'GPU Temperature',
                  'class': 'temperature',
                  'unit': '°C',
                  'icon': 'thermometer',
                  'sensor_type': 'sensor',
-                 'function': get_temp},
+                 'function': get_gpu_temp},
+          'cpu_temperature': 
+                {'name':'CPU Temperature',
+                 'class': 'temperature',
+                 'unit': '°C',
+                 'icon': 'thermometer',
+                 'sensor_type': 'sensor',
+                 'function': get_cpu_temp},
           'clock_speed':
                 {'name':'Clock Speed',
                  'unit': 'MHz',
