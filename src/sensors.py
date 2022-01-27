@@ -17,16 +17,6 @@ VCGENCMD = "vcgencmd"
 # Only needed if using alternate method of obtaining CPU temperature (see commented out code for approach)
 #from os import walk
 
-
-rpi_power_disabled = True
-try:
-    from rpi_bad_power import new_under_voltage
-    if new_under_voltage() is not None:
-        # Only enable if import works and function returns a value
-        rpi_power_disabled = False
-except ImportError:
-    pass
-
 try:
     import apt
     apt_disabled = False
@@ -34,7 +24,7 @@ except ImportError:
     apt_disabled = True
 
 try:
-    subprocess.run(VCGENCMD)
+    subprocess.check_output(VCGENCMD)
     vcgencmd_missing = False
 except Exception:
     vcgencmd_missing = True
@@ -52,15 +42,11 @@ previous_time = time.time() - 10
 UTC = pytz.utc
 DEFAULT_TIME_ZONE = None
 
-if not rpi_power_disabled:
-    _underVoltage = new_under_voltage()
-
-
 def vcgencmd(arg: str):
     cmd = [VCGENCMD, arg]
 
     try:
-        return subprocess.check_output(cmd)
+        return subprocess.check_output(cmd).decode('utf-8').rstrip()
     except subprocess.CalledProcessError as e:
         return None
 
@@ -100,7 +86,7 @@ def get_updates():
 
 def get_throttling(bit):
     try:
-        flags_raw = vcgencmd(arg="get_throttleda")
+        flags_raw = vcgencmd(arg="get_throttled")
         flags = int(flags_raw.split("=")[-1].strip(), 16)
         
         if flags is not None:
@@ -115,7 +101,7 @@ def get_gpu_temp():
     temp = 'Unknown'
 
     try:
-        temp_raw = vcgencmd(arg="measure_tempa")
+        temp_raw = vcgencmd(arg="measure_temp")
         temp = temp_raw.split("=")[1].split("'")[0]
     except Exception as e:
         print(f'Could not establish GPU temperature reading: {str(e)}')
@@ -219,9 +205,6 @@ def get_wifi_ssid():
         ssid = 'UNKNOWN'
     return (ssid)
 
-def get_rpi_power_status():
-    return 'ON' if _underVoltage.get() else 'OFF'
-
 def get_hostname():
     return socket.gethostname()
 
@@ -260,12 +243,12 @@ def external_drive_base(drive, drive_path) -> dict:
         'function': lambda: get_disk_usage(f'{drive_path}')
         }
 
-def throttling_base(name, bit, class_name):
+def throttling_base(bit, name, class_name):
     return  {
         'name': name,
         'class': class_name,
         'sensor_type': 'binary_sensor',
-        'function': lambda: get_throttling(bit)},
+        'function': lambda: get_throttling(bit)}
 
 throttles = {
     "under_volt_now":   (0, "Under-voltage detected",  "problem"),
@@ -349,11 +332,6 @@ sensors = {
                  'icon': 'harddisk',
                  'sensor_type': 'sensor',
                  'function': get_swap_usage},
-          'power_status':
-                {'name': 'Under Voltage',
-                 'class': 'problem',
-                 'sensor_type': 'binary_sensor',
-                 'function': get_rpi_power_status},
           'last_boot':
                 {'name': 'Last Boot',
                  'class': 'timestamp',
