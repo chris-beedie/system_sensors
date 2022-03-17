@@ -11,7 +11,7 @@ import subprocess
 import datetime as dt
 import sys
 
-VCGENCMD = "vcgencmd"
+VCGENCMD = "/opt/vc/bin/vcgencmd"
 
 
 # Only needed if using alternate method of obtaining CPU temperature (see commented out code for approach)
