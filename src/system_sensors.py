@@ -79,7 +79,7 @@ def send_config_message(mqttClient):
                             + f'"unique_id":"{devicename}_sensor_{sensor}",'
                             + f'"availability_topic":"system-sensors/{devicename}/availability",'
                             + f'"device":{{"identifiers":["{devicename}_sensor"],'
-                            + f'"name":"{deviceNameDisplay}","model":"RPI {deviceNameDisplay}", "manufacturer":"RPI"}}'
+                            + f'"name":"{deviceNameDisplay}","model":"{deviceNameDisplay}", "manufacturer":"RPI"}}'
                             + (f',"icon":"mdi:{attr["icon"]}"' if 'icon' in attr else '')
                             + f'}}'
                             ),
