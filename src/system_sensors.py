@@ -71,13 +71,15 @@ def send_config_message(mqttClient):
                     payload = (f'{{'
                             + (f'"device_class":"{attr["class"]}",' if 'class' in attr else '')
                             + f'"name":"{deviceNameDisplay} {attr["name"]}",'
+                            + f'"payload_on": "True",'
+                            + f'"payload_off": "False",'
                             + f'"state_topic":"system-sensors/{devicename}/state",'
                             + (f'"unit_of_measurement":"{attr["unit"]}",' if 'unit' in attr else '')
                             + f'"value_template":"{{{{value_json.{sensor}}}}}",'
                             + f'"unique_id":"{devicename}_sensor_{sensor}",'
                             + f'"availability_topic":"system-sensors/{devicename}/availability",'
                             + f'"device":{{"identifiers":["{devicename}_sensor"],'
-                            + f'"name":"{deviceNameDisplay} Sensors","model":"RPI {deviceNameDisplay}", "manufacturer":"RPI"}}'
+                            + f'"name":"{deviceNameDisplay}","model":"RPI {deviceNameDisplay}", "manufacturer":"RPI"}}'
                             + (f',"icon":"mdi:{attr["icon"]}"' if 'icon' in attr else '')
                             + f'}}'
                             ),
